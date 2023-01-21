@@ -313,44 +313,44 @@ const MODO = objArguments.mode;
 
 // levantar server (el desafio 14 pide que se ingrese por consola y no por .env)
 
-if (MODO === "CLUSTER" && cluster.isPrimary) {
-  logger.warn("modo cluster");
-  const numCPUS = os.cpus().length;
-  for (let i = 0; i < numCPUS; i++) {
-    cluster.fork(); //creamos los subprocesos
-  }
+// if (MODO === "CLUSTER" && cluster.isPrimary) {
+//   logger.warn("modo cluster");
+//   const numCPUS = os.cpus().length;
+//   for (let i = 0; i < numCPUS; i++) {
+//     cluster.fork(); //creamos los subprocesos
+//   }
 
-  cluster.on("exit", (worker) => {
-    logger.error(`El subproceso ${worker.process.pid} falló`);
-    cluster.fork();
+//   cluster.on("exit", (worker) => {
+//     logger.error(`El subproceso ${worker.process.pid} falló`);
+//     cluster.fork();
+//   });
+// } else {
+//   const server = app.listen(PORT, () =>
+//     logger.info(`listening on port ${PORT}`)
+//   );
+const server = app.listen(PORT, () => logger.info(`listening on port ${PORT}`));
+// levantar servidor io
+const io = new Server(server);
+
+io.on("connection", async (socket) => {
+  // lista de productos
+  socket.emit("products", await productosApi.getAll());
+  socket.on("newProduct", async (data) => {
+    await productosApi.save(data);
+    //actualiza la lista de prod. mas lo que le sumo el cliente
+    io.sockets.emit("products", await productosApi.getAll());
   });
-} else {
-  const server = app.listen(PORT, () =>
-    logger.info(`listening on port ${PORT}`)
-  );
-  // levantar servidor io
-  const io = new Server(server);
 
-  io.on("connection", async (socket) => {
-    // lista de productos
-    socket.emit("products", await productosApi.getAll());
-    socket.on("newProduct", async (data) => {
-      await productosApi.save(data);
-      //actualiza la lista de prod. mas lo que le sumo el cliente
-      io.sockets.emit("products", await productosApi.getAll());
-    });
+  // lista de mensajes
 
-    // lista de mensajes
+  //CHAT
+  //Envio de todos los mensajes al socket que se conecta.
+  io.sockets.emit("messages", await normalizarMensajes());
 
-    //CHAT
-    //Envio de todos los mensajes al socket que se conecta.
+  //recibimos el mensaje del usuario y lo guardamos en el archivo chat.txt
+  socket.on("newMessage", async (newMsg) => {
+    await chatApi.save(newMsg);
+
     io.sockets.emit("messages", await normalizarMensajes());
-
-    //recibimos el mensaje del usuario y lo guardamos en el archivo chat.txt
-    socket.on("newMessage", async (newMsg) => {
-      await chatApi.save(newMsg);
-
-      io.sockets.emit("messages", await normalizarMensajes());
-    });
   });
-}
+});
