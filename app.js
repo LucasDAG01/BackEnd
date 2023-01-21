@@ -308,7 +308,7 @@ const defport = {
 const objArguments = parsedArgs(process.argv.slice(2), defport);
 logger.info(objArguments);
 logger.warn("modo fork");
-const PORT = objArguments.port;
+const PORT = process.env.PORT || 8080;
 const MODO = objArguments.mode;
 
 // levantar server (el desafio 14 pide que se ingrese por consola y no por .env)
