@@ -15,7 +15,7 @@ import { options } from "./src/config/dbConfig.js";
 import { productsRouter } from "./src/routes/products.js";
 import { Contenedor } from "./src/components/contenedor.js";
 import { ContenedorChat } from "./src/components/contenedorChat.js";
-import { ContenedorSql } from "./src/components/ContenedorSql.js";
+// import { ContenedorSql } from "./src/components/ContenedorSql.js";
 import { UserModel } from "./src/models/user.js";
 import { config } from "./src/config/envConfig.js";
 import parsedArgs from "minimist";
@@ -313,44 +313,45 @@ const MODO = objArguments.mode;
 
 // levantar server (el desafio 14 pide que se ingrese por consola y no por .env)
 
-// if (MODO === "CLUSTER" && cluster.isPrimary) {
-//   logger.warn("modo cluster");
-//   const numCPUS = os.cpus().length;
-//   for (let i = 0; i < numCPUS; i++) {
-//     cluster.fork(); //creamos los subprocesos
-//   }
+if (MODO === "CLUSTER" && cluster.isPrimary) {
+  logger.warn("modo cluster");
+  const numCPUS = os.cpus().length;
+  for (let i = 0; i < numCPUS; i++) {
+    cluster.fork(); //creamos los subprocesos
+  }
 
-//   cluster.on("exit", (worker) => {
-//     logger.error(`El subproceso ${worker.process.pid} falló`);
-//     cluster.fork();
-//   });
-// } else {
-//   const server = app.listen(PORT, () =>
-//     logger.info(`listening on port ${PORT}`)
-//   );
-const server = app.listen(PORT, () => logger.info(`listening on port ${PORT}`));
-// levantar servidor io
-const io = new Server(server);
-
-io.on("connection", async (socket) => {
-  // lista de productos
-  socket.emit("products", await productosApi.getAll());
-  socket.on("newProduct", async (data) => {
-    await productosApi.save(data);
-    //actualiza la lista de prod. mas lo que le sumo el cliente
-    io.sockets.emit("products", await productosApi.getAll());
+  cluster.on("exit", (worker) => {
+    logger.error(`El subproceso ${worker.process.pid} falló`);
+    cluster.fork();
   });
+} else {
+  const server = app.listen(PORT, () =>
+    logger.info(`listening on port ${PORT}`)
+  );
 
-  // lista de mensajes
+  // levantar servidor io
+  const io = new Server(server);
 
-  //CHAT
-  //Envio de todos los mensajes al socket que se conecta.
-  io.sockets.emit("messages", await normalizarMensajes());
+  io.on("connection", async (socket) => {
+    // lista de productos
+    socket.emit("products", await productosApi.getAll());
+    socket.on("newProduct", async (data) => {
+      await productosApi.save(data);
+      //actualiza la lista de prod. mas lo que le sumo el cliente
+      io.sockets.emit("products", await productosApi.getAll());
+    });
 
-  //recibimos el mensaje del usuario y lo guardamos en el archivo chat.txt
-  socket.on("newMessage", async (newMsg) => {
-    await chatApi.save(newMsg);
+    // lista de mensajes
 
+    //CHAT
+    //Envio de todos los mensajes al socket que se conecta.
     io.sockets.emit("messages", await normalizarMensajes());
+
+    //recibimos el mensaje del usuario y lo guardamos en el archivo chat.txt
+    socket.on("newMessage", async (newMsg) => {
+      await chatApi.save(newMsg);
+
+      io.sockets.emit("messages", await normalizarMensajes());
+    });
   });
-});
+}
